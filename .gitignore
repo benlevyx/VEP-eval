@@ -1,0 +1,24 @@
+# uv
+.venv/
+uv.lock
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Data files
+*.csv
+*.tsv
+*.fasta
+*.fa
+*.gz
+*.vcf
+
+# OS
+.DS_Store
