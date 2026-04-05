@@ -10,17 +10,17 @@ Both plots are saved to the output directory (or displayed interactively if
 
 Usage
 -----
-python -m vep_eval.visualize_esm_scores \\
+python -m vep_eval.visualize_scores \\
     --input all_esm_scores.csv \\
     --output-dir figures/
 
-python -m vep_eval.visualize_esm_scores \\
+python -m vep_eval.visualize_scores \\
     --input all_sift_scores.csv \\
     --output-dir figures/ \\
     --score-col sift_score \\
     --negate
 
-python -m vep_eval.visualize_esm_scores \\
+python -m vep_eval.visualize_scores \\
     --input NP_000007.1_esm.csv \\
     --output-dir figures/ \\
     --title "NP_000007.1"

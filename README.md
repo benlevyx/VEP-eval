@@ -82,7 +82,7 @@ python -m vep_eval.score_proteingym_primateai3d \
 ### Visualization
 
 ```bash
-python -m vep_eval.visualize_esm_scores \
+python -m vep_eval.visualize_scores \
     --input results/<run-name>/scores.csv \
     --output-dir figures/ \
     --no-timestamp --run-name <model-name>
