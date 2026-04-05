@@ -25,7 +25,6 @@ python -m vep_eval.score_proteingym_esm \\
 
 import argparse
 import logging
-import re
 import sys
 from pathlib import Path
 
@@ -33,6 +32,12 @@ import numpy as np
 import pandas as pd
 import torch
 
+from vep_eval.proteingym_io import (
+    build_score_output,
+    collect_csv_paths,
+    load_gene_df,
+    parse_mutant,
+)
 from vep_eval.run_name import add_run_name_args, build_run_name, resolve_output_dir
 
 # ---------------------------------------------------------------------------
@@ -45,8 +50,7 @@ logging.basicConfig(
 )
 log = logging.getLogger(__name__)
 
-# The 20 canonical amino acids in ESM's preferred order
-AA_ORDER = list("KRHEDNQTSCGAVLIMPYFW")
+AA_ORDER = list("KRHEDNQTSCGAVLIMPYFW")  # 20 canonical AAs in ESM's preferred order
 
 # ESM1b context window
 ESM_MAX_LEN = 1022
@@ -181,18 +185,6 @@ def compute_llr_matrix(
 # ---------------------------------------------------------------------------
 
 
-def parse_mutant(mutant: str) -> tuple[str, int, str]:
-    """
-    Parse a single-substitution string such as "R29L".
-
-    Returns (wt_aa, position, mut_aa). Raises ValueError for unrecognised formats.
-    """
-    m = re.fullmatch(r"([A-Z\*])(\d+)([A-Z\*])", mutant.strip().upper())
-    if m is None:
-        raise ValueError(f"Cannot parse mutant: {mutant!r}")
-    return m.group(1), int(m.group(2)), m.group(3)
-
-
 def lookup_llr(llr_df: pd.DataFrame, wt_aa: str, pos: int, mut_aa: str) -> float:
     """Return LLR for a substitution, or NaN if position/AA is out of range."""
     col = f"{wt_aa} {pos}"
@@ -218,15 +210,7 @@ def score_gene_csv(
 
     Returns a DataFrame with columns: protein, mutant, esm_score, DMS_bin_score.
     """
-    df = pd.read_csv(csv_path, index_col=0)
-
-    missing = {"protein", "protein_sequence", "mutant"} - set(df.columns)
-    if missing:
-        raise ValueError(f"{csv_path.name}: missing columns {missing}")
-
-    protein_id = df["protein"].iloc[0]
-    wt_seq = df["protein_sequence"].iloc[0]
-
+    df, protein_id, wt_seq = load_gene_df(csv_path)
     log.info("  %s  seq_len=%d  n_variants=%d", protein_id, len(wt_seq), len(df))
 
     llr_df = compute_llr_matrix(wt_seq, protein_id, model, alphabet, batch_converter, device)
@@ -246,11 +230,7 @@ def score_gene_csv(
     if n_skipped:
         log.warning("  %d unparseable mutant(s) in %s", n_skipped, csv_path.name)
 
-    out = df[["protein", "mutant"]].copy()
-    out["esm_score"] = scores
-    if "DMS_bin_score" in df.columns:
-        out["DMS_bin_score"] = df["DMS_bin_score"].values
-    return out
+    return build_score_output(df, "esm_score", scores)
 
 
 # ---------------------------------------------------------------------------
@@ -300,15 +280,7 @@ def main(argv=None):
     log.info("Loading model: %s", args.model_name)
     model, alphabet, batch_converter = load_esm_model(args.model_name, device)
 
-    input_path = Path(args.input)
-    csv_paths = sorted(input_path.glob("*.csv")) if input_path.is_dir() else [input_path]
-    if not csv_paths:
-        log.error("No CSV files found at %s", input_path)
-        sys.exit(1)
-    if args.max_inputs is not None:
-        csv_paths = csv_paths[: args.max_inputs]
-        log.info("Limiting to first %d CSV file(s) (--max-inputs)", args.max_inputs)
-    log.info("%d gene CSV(s) to process", len(csv_paths))
+    csv_paths = collect_csv_paths(Path(args.input), args.max_inputs)
 
     results = []
     for i, csv_path in enumerate(csv_paths, 1):
